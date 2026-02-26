@@ -1,4 +1,4 @@
-name: Build A530F Kernel Auto-Fix
+name: Build A530F Kernel Final Fix
 on:
   workflow_dispatch:
 
@@ -14,30 +14,33 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Build and Auto-Confirm
+      - name: Patch and Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # البحث عن ملف الإعدادات
+          # اختيار ملف الإعدادات
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
-          # تفعيل ميزات HID وتعطيل LTO
+          # إيقاف ميزة UKSM المسببة للخطأ الأخير (01:30)
+          sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' .config || true
+          
+          # تعطيل LTO وتفعيل ميزات النتهنتر
           sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config || true
           echo "CONFIG_USB_G_HID=y" >> .config
           echo "CONFIG_USB_F_HID=y" >> .config
           echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
           
-          # الأمر السحري للإجابة على جميع الأسئلة تلقائياً (تجاوز توقف 01:26)
+          # الإجابة التلقائية على أي أسئلة تكوين
           yes "" | make oldconfig
           
-          # بدء التجميع الفعلي
-          make -j$(nproc) KCFLAGS="-fno-lto"
+          # التجميع النهائي مع تجاهل تحذيرات السمات
+          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
           
       - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Final-Ready
+          name: Kernel-A530F-Ready
           path: kernel/arch/arm64/boot/Image.gz-dtb
