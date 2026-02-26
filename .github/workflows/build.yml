@@ -1,54 +1,44 @@
-name: Build A530F Kernel Fix Final
+name: Build A530F Final Success
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-      - name: Setup Environment
+      - name: Setup Build Environment
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
+          sudo apt install -y bc bison build-essential flex git libssl-dev python2 libc6-i386 libncurses5
+          # تحميل مترجم GCC متوافق مع الأنوية القديمة
+          git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r21 --depth=1 gcc
           
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Surgical Repair
-        run: |
-          cd kernel
-          # إصلاح ملفات الـ Headers المسببة للأخطاء في صورك السابقة
-          # حذف الأسطر التي تسببت في خطأ "numeric constant" في الساعة 02:37
-          sed -i '/uksm_zero_pfn/d' include/asm-generic/pgtable.h || true
-          sed -i '/is_uksm_zero_pfn/d' include/asm-generic/pgtable.h || true
-          
-          # تعطيل UKSM نهائياً لمنع توقف البناء كما حدث في 01:37
-          find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
-          
-      - name: Professional Compilation
+      - name: Configure and Compile
         run: |
           cd kernel
           export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE=$(pwd)/../gcc/bin/aarch64-linux-android-
           
-          # البحث عن ملف الإعدادات المخصص لجهازك (A8 / 7885)
-          CONF=$(find arch/arm64/configs/ -name "*defconfig" | grep -E "a8|7885" | head -n 1)
-          if [ -z "$CONF" ]; then CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1); fi
+          # استعادة الملفات لأصلها لتجنب خطأ (02:56)
+          git checkout arch/arm64/include/asm/pgtable.h include/asm-generic/pgtable.h || true
           
-          make $(basename $CONF)
+          # استخدام الإعدادات الافتراضية للمعالج
+          make exynos7885_defconfig || make a8y18lte_defconfig || make $(ls arch/arm64/configs/ | grep 7885 | head -n 1)
           
-          # تفعيل ميزات NetHunter (HID)
+          # تفعيل ميزات النتهنتر مباشرة
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
-          scripts/config --enable USB_CONFIGFS_F_HID
           scripts/config --disable LTO_CLANG
+          scripts/config --disable UKSM
           
-          # بناء النواة مع تجاهل صارم للتحذيرات
           yes "" | make oldconfig
-          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
+          make -j$(nproc)
           
       - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Final-Release
+          name: Kernel-A530F-Final-Ready
           path: kernel/arch/arm64/boot/Image.gz-dtb
