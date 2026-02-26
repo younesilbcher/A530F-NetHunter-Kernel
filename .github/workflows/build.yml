@@ -1,4 +1,4 @@
-name: Build A530F Final Repair
+name: Build A530F Kernel Ultimate Fix
 on:
   workflow_dispatch:
 
@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Environment
+      - name: Setup Tools
         run: |
           sudo apt update
           sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
@@ -14,35 +14,38 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Hard Patch UKSM Error
+      - name: Surgical Patching (UKSM Removal)
         run: |
           cd kernel
-          # حذف أسطر الكود المسببة لخطأ section attribute في ملف pgtable.h
-          sed -i '/uksm_zero_pfn/d' arch/arm64/include/asm/pgtable.h
-          sed -i '/is_uksm_zero_pfn/d' arch/arm64/include/asm/pgtable.h
+          # حذف الميزة المسببة للخطأ من كافة ملفات الـ Headers
+          find . -type f -name "*.h" -exec sed -i '/uksm_zero_pfn/d' {} +
+          find . -type f -name "*.h" -exec sed -i '/is_uksm_zero_pfn/d' {} +
+          # تنظيف إضافي لملفات الـ C لضمان عدم وجود استدعاءات مفقودة
+          find . -type f -name "*.c" -exec sed -i '/uksm_zero_pfn/d' {} +
           
-      - name: Smart Config and Build
+      - name: Configure and Compile
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # اختيار ملف الإعدادات وتعطيل UKSM
+          # اختيار الإعدادات الافتراضية
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
+          # تفعيل ميزات HID وتعطيل المشاكل
           scripts/config --disable UKSM
           scripts/config --disable LTO_CLANG
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_F_MASS_STORAGE
           
-          # الإجابة التلقائية وتجاهل الأخطاء
+          # الإجابة التلقائية وتجاهل التحذيرات
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
           
-      - name: Upload Kernel
+      - name: Upload Finished Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Fixed
+          name: Kernel-A530F-NetHunter-Ready
           path: kernel/arch/arm64/boot/Image.gz-dtb
