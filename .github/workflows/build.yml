@@ -1,4 +1,4 @@
-name: Build A530F Kernel Success Final
+name: Build A530F Kernel Final Success
 on:
   workflow_dispatch:
 
@@ -14,40 +14,39 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Surgical Clean-up
+      - name: Hard Disable UKSM
         run: |
           cd kernel
-          # تعطيل UKSM نهائياً لمنع أي تداخل برمي
+          # تعطيل الميزة في ملفات الإعدادات لمنع استدعاء الأكواد الخاطئة
           find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
           
-          # استبدال شامل لكل استدعاءات الميزة المسببة للخطأ بقيمة صفر ثابتة
-          # هذا سيحل أخطاء الساعات (01:56، 02:25، 02:31) دفعة واحدة
-          grep -rl "uksm_zero_pfn" . | xargs sed -i 's/uksm_zero_pfn/0UL/g' || true
-          grep -rl "is_uksm_zero_pfn" . | xargs sed -i 's/is_uksm_zero_pfn(.\+)/0/g' || true
+          # إعادة الملفات لأصلها (تنظيف المحاولات السابقة) لمنع خطأ "numeric constant"
+          git checkout include/asm-generic/pgtable.h || true
           
-      - name: Professional Build
+      - name: Build NetHunter Kernel
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # جلب التكوين
-          ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
-          make $(basename $ANY_CONF)
+          # اختيار ملف الإعدادات
+          CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
+          make $(basename $CONF)
           
-          # تفعيل ميزات NetHunter HID و Mass Storage
+          # تفعيل ميزات النتهنتر الأساسية وتعطيل LTO
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_CONFIGFS_F_HID
           scripts/config --enable USB_F_MASS_STORAGE
           scripts/config --disable LTO_CLANG
+          scripts/config --disable UKSM
           
-          # بدء البناء الفعلي مع تجاهل التحذيرات
+          # بناء النواة
           yes "" | make oldconfig
-          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
+          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
           
-      - name: Export Final Kernel
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-NetHunter-Stable
+          name: Kernel-A530F-NetHunter-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
