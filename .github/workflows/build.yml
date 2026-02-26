@@ -1,4 +1,4 @@
-name: Build A530F Final Success
+name: A530F Fast Build
 on:
   workflow_dispatch:
 
@@ -6,39 +6,33 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-      - name: Setup Build Environment
+      - name: Environment
         run: |
           sudo apt update
           sudo apt install -y bc bison build-essential flex git libssl-dev python2 libc6-i386 libncurses5
-          # تحميل مترجم GCC متوافق مع الأنوية القديمة
           git clone https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b ndk-release-r21 --depth=1 gcc
           
-      - name: Clone Source
-        run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
+      - name: Clone and Patch
+        run: |
+          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
+          cd kernel
+          # تعطيل الميزات الثقيلة والمسببة للأخطاء لضمان سرعة البناء
+          scripts/config --disable UKSM
+          scripts/config --disable LTO_CLANG
+          scripts/config --enable USB_G_HID
+          scripts/config --enable USB_F_HID
           
-      - name: Configure and Compile
+      - name: Compilation
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=$(pwd)/../gcc/bin/aarch64-linux-android-
-          
-          # استعادة الملفات لأصلها لتجنب خطأ (02:56)
-          git checkout arch/arm64/include/asm/pgtable.h include/asm-generic/pgtable.h || true
-          
-          # استخدام الإعدادات الافتراضية للمعالج
-          make exynos7885_defconfig || make a8y18lte_defconfig || make $(ls arch/arm64/configs/ | grep 7885 | head -n 1)
-          
-          # تفعيل ميزات النتهنتر مباشرة
-          scripts/config --enable USB_G_HID
-          scripts/config --enable USB_F_HID
-          scripts/config --disable LTO_CLANG
-          scripts/config --disable UKSM
-          
+          make exynos7885_defconfig
           yes "" | make oldconfig
-          make -j$(nproc)
+          make -j$(nproc) KCFLAGS="-Wno-error"
           
-      - name: Upload Kernel
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Final-Ready
+          name: Kernel-A530F-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
