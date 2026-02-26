@@ -14,28 +14,27 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Auto-Fix and Compile
+      - name: Fix and Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # خطوة البحث عن الملف الصحيح وتفعيله
+          # البحث عن ملف الإعدادات
           CONF=$(find arch/arm64/configs/ -name "*defconfig" | grep -i "a8" | head -n 1)
-          if [ -z "$CONF" ]; then CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1); fi
-          
-          echo "Found Config: $CONF"
           make $(basename $CONF)
           
-          # إضافة ميزات NetHunter
+          # تعطيل الـ LTO المسبب للخطأ وتفعيل ميزات HID
+          sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config
           echo "CONFIG_USB_G_HID=y" >> .config
           echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
           echo "CONFIG_USB_CONFIGFS_F_HID=y" >> .config
           
+          # بدء التجميع
           make -j$(nproc)
           
       - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-NetHunter
+          name: Kernel-A530F-Fixed
           path: kernel/arch/arm64/boot/Image.gz-dtb
