@@ -5,21 +5,30 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup
-        run: sudo apt update && sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
-      - name: Source
+      - name: Setup Tools
+        run: |
+          sudo apt update
+          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
+          
+      - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
-      - name: Compile
+          
+      - name: Auto-Compile
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          make a8y18lte_defconfig
+          # البحث عن ملف التكوين الصحيح وتشغيله
+          CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
+          make $(basename $CONF)
+          # إضافة ميزات HID و Mass Storage مباشرة للملف الناتج
           echo "CONFIG_USB_G_HID=y" >> .config
           echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
+          echo "CONFIG_USB_CONFIGFS_F_HID=y" >> .config
           make -j$(nproc)
-      - name: Final
+          
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F
+          name: Kernel-A530F-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
