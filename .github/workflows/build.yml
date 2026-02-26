@@ -1,4 +1,4 @@
-name: Build A530F Kernel Pro
+name: Build A530F Kernel Final
 on:
   workflow_dispatch:
 
@@ -6,41 +6,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Build Environment
+      - name: Setup Environment
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev clang lld
+          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
           
-      - name: Clone Kernel Source
+      - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Advanced Configuration
+      - name: Configure and Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # البحث عن أفضل ملف إعدادات متوفر
-          CONF=$(find arch/arm64/configs/ -name "*defconfig" | grep -i "a8" | head -n 1)
-          make $(basename $CONF)
+          # استخدام اسم ملف الإعدادات المباشر لجهاز A530F
+          make a8y18lte_defconfig || make exynos7885_defconfig
           
           # تعطيل الخيارات المسببة للفشل وتفعيل ميزات النتهنتر
-          scripts/config --disable LTO_CLANG
-          scripts/config --disable LTO_CLANG_THIN
-          scripts/config --enable USB_G_HID
-          scripts/config --enable USB_CONFIGFS_F_HID
-          scripts/config --enable USB_F_MASS_STORAGE
+          sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config
+          echo "CONFIG_USB_G_HID=y" >> .config
+          echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
+          echo "CONFIG_USB_CONFIGFS_F_HID=y" >> .config
           
-      - name: Pro Compilation
-        run: |
-          cd kernel
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          # استخدام مجمع GCC لتجنب أخطاء Clang LTO
+          # بدء التجميع مع تجاهل أخطاء الـ LTO
           make -j$(nproc) KCFLAGS="-fno-lto"
           
-      - name: Export Result
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Pro
+          name: Kernel-A530F-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
