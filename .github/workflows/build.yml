@@ -1,4 +1,4 @@
-name: Build A530F Kernel Final Fix
+name: Build A530F Final Version
 on:
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Patch and Build
+      - name: Force Patch and Build
         run: |
           cd kernel
           export ARCH=arm64
@@ -24,23 +24,24 @@ jobs:
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
-          # إيقاف ميزة UKSM المسببة للخطأ الأخير (01:30)
+          # الخطوة الحاسمة: تعطيل UKSM وإزالتها لضمان تجاوز خطأ 01:37
+          scripts/config --disable UKSM
           sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' .config || true
           
           # تعطيل LTO وتفعيل ميزات النتهنتر
-          sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config || true
-          echo "CONFIG_USB_G_HID=y" >> .config
-          echo "CONFIG_USB_F_HID=y" >> .config
-          echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
+          scripts/config --disable LTO_CLANG
+          scripts/config --enable USB_G_HID
+          scripts/config --enable USB_F_HID
+          scripts/config --enable USB_F_MASS_STORAGE
           
-          # الإجابة التلقائية على أي أسئلة تكوين
+          # الإجابة التلقائية على أي أسئلة
           yes "" | make oldconfig
           
-          # التجميع النهائي مع تجاهل تحذيرات السمات
-          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
+          # التجميع النهائي مع تجاهل صارم للأخطاء الثانوية
+          make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
           
       - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Ready
+          name: Kernel-A530F-Final-Ready
           path: kernel/arch/arm64/boot/Image.gz-dtb
