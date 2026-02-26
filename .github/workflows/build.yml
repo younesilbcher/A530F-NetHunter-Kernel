@@ -1,4 +1,4 @@
-name: Build A530F Final Version
+name: Build A530F Final Repair
 on:
   workflow_dispatch:
 
@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Tools
+      - name: Setup Environment
         run: |
           sudo apt update
           sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
@@ -14,34 +14,35 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Force Patch and Build
+      - name: Hard Patch UKSM Error
+        run: |
+          cd kernel
+          # حذف أسطر الكود المسببة لخطأ section attribute في ملف pgtable.h
+          sed -i '/uksm_zero_pfn/d' arch/arm64/include/asm/pgtable.h
+          sed -i '/is_uksm_zero_pfn/d' arch/arm64/include/asm/pgtable.h
+          
+      - name: Smart Config and Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # اختيار ملف الإعدادات
+          # اختيار ملف الإعدادات وتعطيل UKSM
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
-          # الخطوة الحاسمة: تعطيل UKSM وإزالتها لضمان تجاوز خطأ 01:37
           scripts/config --disable UKSM
-          sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' .config || true
-          
-          # تعطيل LTO وتفعيل ميزات النتهنتر
           scripts/config --disable LTO_CLANG
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_F_MASS_STORAGE
           
-          # الإجابة التلقائية على أي أسئلة
+          # الإجابة التلقائية وتجاهل الأخطاء
           yes "" | make oldconfig
-          
-          # التجميع النهائي مع تجاهل صارم للأخطاء الثانوية
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
           
       - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Final-Ready
+          name: Kernel-A530F-Fixed
           path: kernel/arch/arm64/boot/Image.gz-dtb
