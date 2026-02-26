@@ -6,35 +6,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Environment
+      - name: Setup Tools
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
+          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
           
       - name: Clone Source
-        run: |
-          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
+        run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Configure and Patch
+      - name: Auto-Fix and Compile
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          make a8y18lte_defconfig
-          # تفعيل ميزات HID و Mass Storage
+          
+          # خطوة البحث عن الملف الصحيح وتفعيله
+          CONF=$(find arch/arm64/configs/ -name "*defconfig" | grep -i "a8" | head -n 1)
+          if [ -z "$CONF" ]; then CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1); fi
+          
+          echo "Found Config: $CONF"
+          make $(basename $CONF)
+          
+          # إضافة ميزات NetHunter
           echo "CONFIG_USB_G_HID=y" >> .config
           echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
           echo "CONFIG_USB_CONFIGFS_F_HID=y" >> .config
           
-      - name: Start Compilation
-        run: |
-          cd kernel
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
           make -j$(nproc)
           
-      - name: Save Artifact
+      - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: NetHunter-Kernel-A530F
+          name: Kernel-A530F-NetHunter
           path: kernel/arch/arm64/boot/Image.gz-dtb
