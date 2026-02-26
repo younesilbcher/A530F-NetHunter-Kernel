@@ -15,24 +15,24 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Patch Features
+      - name: Patch and Build
         run: |
           cd kernel
-          echo "CONFIG_USB_G_HID=y" >> arch/arm64/configs/a8y18lte_defconfig
-          echo "CONFIG_USB_F_MASS_STORAGE=y" >> arch/arm64/configs/a8y18lte_defconfig
-          echo "CONFIG_USB_CONFIGFS_F_HID=y" >> arch/arm64/configs/a8y18lte_defconfig
-          echo "CONFIG_USB_CONFIGFS_F_MASS_STORAGE=y" >> arch/arm64/configs/a8y18lte_defconfig
-
-      - name: Build
-        run: |
-          cd kernel
+          # البحث عن ملف الإعدادات الصحيح وتفعيله
+          CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
+          echo "Using config: $CONF"
+          make $(basename $CONF)
+          
+          # إضافة ميزات HID
+          echo "CONFIG_USB_G_HID=y" >> .config
+          echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
+          
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          make a8y18lte_defconfig
           make -j$(nproc)
           
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-Image
+          name: Kernel-A530F
           path: kernel/arch/arm64/boot/Image.gz-dtb
