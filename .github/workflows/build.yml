@@ -1,4 +1,4 @@
-name: Build A530F Kernel Fix Final
+name: Build A530F Kernel Final Success
 on:
   workflow_dispatch:
 
@@ -14,38 +14,39 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Surgical UKSM Removal
+      - name: Ultimate Patching
         run: |
           cd kernel
-          # تعطيل UKSM في ملفات الإعدادات لمنع استدعائها
+          # تعطيل UKSM نهائياً من الإعدادات
           find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
           
-          # استبدال الوظائف المسببة للخطأ بوظائف فارغة لضمان عدم توقف المترجم
-          sed -i 's/extern __read_mostly unsigned long uksm_zero_pfn;/static const unsigned long uksm_zero_pfn = 0;/g' include/asm-generic/pgtable.h || true
-          sed -i 's/extern __read_mostly unsigned long zero_pfn;/static const unsigned long zero_pfn = 0;/g' include/asm-generic/pgtable.h || true
+          # إصلاح شامل لتعريفات الـ Zero PFN لتجنب خطأ Drivers (02:25)
+          grep -rl "uksm_zero_pfn" . | xargs sed -i 's/uksm_zero_pfn/0/g' || true
+          grep -rl "zero_pfn" . | xargs sed -i 's/zero_pfn/0/g' || true
           
-      - name: Build Kernel
+      - name: Compilation
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # جلب الإعدادات
+          # ضبط الإعدادات
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
-          # تفعيل ميزات النتهنتر
+          # تفعيل ميزات النتهنتر الأساسية
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
+          scripts/config --enable USB_CONFIGFS_F_HID
           scripts/config --enable USB_F_MASS_STORAGE
           scripts/config --disable LTO_CLANG
           
-          # بناء النواة وتجاهل التحذيرات
+          # بناء النواة
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
           
-      - name: Upload Finished Kernel
+      - name: Upload Kernel Image
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Successful-Build
+          name: Kernel-A530F-NetHunter-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
