@@ -1,4 +1,4 @@
-name: Build A530F Final Attempt
+name: Build A530F Kernel Fix Final
 on:
   workflow_dispatch:
 
@@ -9,41 +9,46 @@ jobs:
       - name: Setup Environment
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
+          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
           
-      - name: Clone Stable Source
-        run: git clone --depth=1 https://github.com/DAE-SUNG/android_kernel_samsung_exynos7885.git kernel
+      - name: Clone Source
+        run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Auto-Config and Repair
+      - name: Surgical Repair
+        run: |
+          cd kernel
+          # إصلاح ملفات الـ Headers المسببة للأخطاء في صورك السابقة
+          # حذف الأسطر التي تسببت في خطأ "numeric constant" في الساعة 02:37
+          sed -i '/uksm_zero_pfn/d' include/asm-generic/pgtable.h || true
+          sed -i '/is_uksm_zero_pfn/d' include/asm-generic/pgtable.h || true
+          
+          # تعطيل UKSM نهائياً لمنع توقف البناء كما حدث في 01:37
+          find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
+          
+      - name: Professional Compilation
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # البحث عن ملف الإعدادات الذي يحتوي على رقم الموديل 7885
-          CONF=$(find arch/arm64/configs/ -name "*7885*" | head -n 1)
-          echo "Using Config: $CONF"
+          # البحث عن ملف الإعدادات المخصص لجهازك (A8 / 7885)
+          CONF=$(find arch/arm64/configs/ -name "*defconfig" | grep -E "a8|7885" | head -n 1)
+          if [ -z "$CONF" ]; then CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1); fi
+          
           make $(basename $CONF)
           
-          # تفعيل ميزات HID الأساسية للنتهنتر
+          # تفعيل ميزات NetHunter (HID)
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_CONFIGFS_F_HID
-          
-          # تعطيل الميزات التي تسبب مشاكل مع المترجم الحديث
           scripts/config --disable LTO_CLANG
-          scripts/config --disable UKSM || true
           
-      - name: Build Kernel
-        run: |
-          cd kernel
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
+          # بناء النواة مع تجاهل صارم للتحذيرات
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
           
-      - name: Export File
+      - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A8-2018-Final
+          name: Kernel-A530F-Final-Release
           path: kernel/arch/arm64/boot/Image.gz-dtb
