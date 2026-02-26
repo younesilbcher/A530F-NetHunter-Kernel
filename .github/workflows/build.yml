@@ -1,4 +1,4 @@
-name: Build A530F Official Config
+name: Build A530F Final Attempt
 on:
   workflow_dispatch:
 
@@ -6,38 +6,44 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup
+      - name: Setup Environment
         run: |
           sudo apt update
           sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
           
-      - name: Clone
-        run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
+      - name: Clone Stable Source
+        run: git clone --depth=1 https://github.com/DAE-SUNG/android_kernel_samsung_exynos7885.git kernel
           
-      - name: Build Official A530F
+      - name: Auto-Config and Repair
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # استخدام الكود المخصص لهاتفك مباشرة
-          make a8y18lte_defconfig
+          # البحث عن ملف الإعدادات الذي يحتوي على رقم الموديل 7885
+          CONF=$(find arch/arm64/configs/ -name "*7885*" | head -n 1)
+          echo "Using Config: $CONF"
+          make $(basename $CONF)
           
-          # إيقاف الميزات المسببة للانهيار (UKSM & LTO)
-          scripts/config --disable UKSM
-          scripts/config --disable LTO_CLANG
-          
-          # تفعيل ميزات النتهنتر (HID)
+          # تفعيل ميزات HID الأساسية للنتهنتر
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_CONFIGFS_F_HID
           
-          # بناء نهائي مستقر
+          # تعطيل الميزات التي تسبب مشاكل مع المترجم الحديث
+          scripts/config --disable LTO_CLANG
+          scripts/config --disable UKSM || true
+          
+      - name: Build Kernel
+        run: |
+          cd kernel
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
           
-      - name: Upload
+      - name: Export File
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-Official
+          name: Kernel-A8-2018-Final
           path: kernel/arch/arm64/boot/Image.gz-dtb
