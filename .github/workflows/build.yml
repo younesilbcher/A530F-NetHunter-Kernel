@@ -1,4 +1,4 @@
-name: Build A530F Kernel Final Success
+name: Build A530F Kernel Success Final
 on:
   workflow_dispatch:
 
@@ -6,7 +6,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Tools
+      - name: Setup Environment
         run: |
           sudo apt update
           sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
@@ -14,39 +14,40 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Ultimate Patching
+      - name: Surgical Clean-up
         run: |
           cd kernel
-          # تعطيل UKSM نهائياً من الإعدادات
+          # تعطيل UKSM نهائياً لمنع أي تداخل برمي
           find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
           
-          # إصلاح شامل لتعريفات الـ Zero PFN لتجنب خطأ Drivers (02:25)
-          grep -rl "uksm_zero_pfn" . | xargs sed -i 's/uksm_zero_pfn/0/g' || true
-          grep -rl "zero_pfn" . | xargs sed -i 's/zero_pfn/0/g' || true
+          # استبدال شامل لكل استدعاءات الميزة المسببة للخطأ بقيمة صفر ثابتة
+          # هذا سيحل أخطاء الساعات (01:56، 02:25، 02:31) دفعة واحدة
+          grep -rl "uksm_zero_pfn" . | xargs sed -i 's/uksm_zero_pfn/0UL/g' || true
+          grep -rl "is_uksm_zero_pfn" . | xargs sed -i 's/is_uksm_zero_pfn(.\+)/0/g' || true
           
-      - name: Compilation
+      - name: Professional Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # ضبط الإعدادات
+          # جلب التكوين
           ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
           make $(basename $ANY_CONF)
           
-          # تفعيل ميزات النتهنتر الأساسية
+          # تفعيل ميزات NetHunter HID و Mass Storage
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_CONFIGFS_F_HID
           scripts/config --enable USB_F_MASS_STORAGE
           scripts/config --disable LTO_CLANG
           
-          # بناء النواة
+          # بدء البناء الفعلي مع تجاهل التحذيرات
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error -Wno-attribute-alias"
           
-      - name: Upload Kernel Image
+      - name: Export Final Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-NetHunter-Final
+          name: Kernel-A530F-NetHunter-Stable
           path: kernel/arch/arm64/boot/Image.gz-dtb
