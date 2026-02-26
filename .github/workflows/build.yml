@@ -1,4 +1,4 @@
-name: Build A530F Kernel Final Success
+name: Build A530F Official Config
 on:
   workflow_dispatch:
 
@@ -6,47 +6,38 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Setup Environment
+      - name: Setup
         run: |
           sudo apt update
-          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3 libncurses5-dev
+          sudo apt install -y bc bison build-essential flex gcc-aarch64-linux-gnu git libssl-dev python3
           
-      - name: Clone Source
+      - name: Clone
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Hard Disable UKSM
-        run: |
-          cd kernel
-          # تعطيل الميزة في ملفات الإعدادات لمنع استدعاء الأكواد الخاطئة
-          find arch/arm64/configs/ -name "*defconfig" -exec sed -i 's/CONFIG_UKSM=y/CONFIG_UKSM=n/g' {} +
-          
-          # إعادة الملفات لأصلها (تنظيف المحاولات السابقة) لمنع خطأ "numeric constant"
-          git checkout include/asm-generic/pgtable.h || true
-          
-      - name: Build NetHunter Kernel
+      - name: Build Official A530F
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # اختيار ملف الإعدادات
-          CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
-          make $(basename $CONF)
+          # استخدام الكود المخصص لهاتفك مباشرة
+          make a8y18lte_defconfig
           
-          # تفعيل ميزات النتهنتر الأساسية وتعطيل LTO
+          # إيقاف الميزات المسببة للانهيار (UKSM & LTO)
+          scripts/config --disable UKSM
+          scripts/config --disable LTO_CLANG
+          
+          # تفعيل ميزات النتهنتر (HID)
           scripts/config --enable USB_G_HID
           scripts/config --enable USB_F_HID
           scripts/config --enable USB_CONFIGFS_F_HID
-          scripts/config --enable USB_F_MASS_STORAGE
-          scripts/config --disable LTO_CLANG
-          scripts/config --disable UKSM
           
-          # بناء النواة
+          # بناء نهائي مستقر
           yes "" | make oldconfig
           make -j$(nproc) KCFLAGS="-fno-lto -Wno-error"
           
-      - name: Upload Result
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F-NetHunter-Final
+          name: Kernel-A530F-Official
           path: kernel/arch/arm64/boot/Image.gz-dtb
