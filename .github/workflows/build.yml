@@ -1,4 +1,4 @@
-name: Build A530F Kernel Final
+name: Build A530F Kernel Final Fix
 on:
   workflow_dispatch:
 
@@ -14,25 +14,27 @@ jobs:
       - name: Clone Source
         run: git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
           
-      - name: Configure and Build
+      - name: Smart Config and Build
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
-          # استخدام اسم ملف الإعدادات المباشر لجهاز A530F
-          make a8y18lte_defconfig || make exynos7885_defconfig
+          # البحث عن أول ملف defconfig متاح في المجلد واستخدامه تلقائياً
+          ANY_CONF=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
+          echo "Found Config: $ANY_CONF"
+          make $(basename $ANY_CONF)
           
           # تعطيل الخيارات المسببة للفشل وتفعيل ميزات النتهنتر
-          sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config
+          sed -i 's/CONFIG_LTO_CLANG=y/CONFIG_LTO_NONE=y/g' .config || true
           echo "CONFIG_USB_G_HID=y" >> .config
+          echo "CONFIG_USB_F_HID=y" >> .config
           echo "CONFIG_USB_F_MASS_STORAGE=y" >> .config
-          echo "CONFIG_USB_CONFIGFS_F_HID=y" >> .config
           
-          # بدء التجميع مع تجاهل أخطاء الـ LTO
+          # بدء التجميع
           make -j$(nproc) KCFLAGS="-fno-lto"
           
-      - name: Upload Result
+      - name: Upload Kernel
         uses: actions/upload-artifact@v4
         with:
           name: Kernel-A530F-Final
