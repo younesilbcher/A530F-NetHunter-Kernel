@@ -1,10 +1,6 @@
-name: Build Kernel
+name: Build NetHunter Kernel Final
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -18,36 +14,46 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev libgl1-mesa-dev libxml2-utils xsltproc unzip python3-pip
+          # إضافة ccache و bc وكافة الأدوات اللازمة لحل أخطاء التجميع
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
+          libgl1-mesa-dev libxml2-utils xsltproc unzip python3-pip ccache bc libssl-dev
 
       - name: Clone Toolchain
         run: |
-          # أدوات بناء حديثة ومستقرة
+          # استخدام أداة بناء Arter97 الموثوقة والمتوافقة
           git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
       - name: Clone Kernel Source
         run: |
-          # سورس النواة الخاص بجهازك
-          git clone --depth=1 https://github.com/devkingsteam/SWIFT-android_kernel_samsung_universal7885.git kernel
+          # استخدام سورس Neternels المخصص لـ NetHunter و Exynos 7885
+          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
 
-      - name: Build Kernel
+      - name: Configure and Build
         run: |
           cd kernel
-          # إعداد متغيرات البيئة
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
+          export PATH="/usr/lib/ccache:$PATH"
           
-          # تفعيل ميزات NetHunter تلقائياً
-          echo "CONFIG_WLAN=y" >> arch/arm64/configs/universal7885_defconfig                
-          echo "CONFIG_MAC80211=y" >> arch/arm64/configs/universal7885_defconfig                
-          echo "CONFIG_CFG80211=y" >> arch/arm64/configs/universal7885_defconfig                
+          # اختيار ملف الإعدادات الصحيح لجهازك (Neternels-a10_defconfig متوافق مع معالجك)
+          make O=out Neternels-a10_defconfig
           
-          # بناء النواة
-          make O=out universal7885_defconfig                
+          # حقن التعريفات الخاصة بـ NetHunter (Monitor Mode & HID) داخل ملف الإعدادات
+          scripts/config --file out/.config --enable CONFIG_WLAN
+          scripts/config --file out/.config --enable CONFIG_MAC80211
+          scripts/config --file out/.config --enable CONFIG_CFG80211
+          scripts/config --file out/.config --enable CONFIG_MAC80211_RC_DEFAULT_MINSTREL
+          scripts/config --file out/.config --enable CONFIG_USB_GADGET
+          scripts/config --file out/.config --enable CONFIG_USB_G_ANDROID
+          scripts/config --file out/.config --enable CONFIG_USB_CONFIGFS
+          scripts/config --file out/.config --enable CONFIG_USB_CONFIGFS_F_HID
+          
+          # بدء عملية التجميع الفعلي باستخدام كافة نويات المعالج المتوفرة
           make O=out -j$(nproc --all)
 
-      - name: Upload Artifact
+      - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-build
+          name: NetHunter-Kernel-A8-2018
+          # المسار الناتج لملف النواة المجمع
           path: kernel/out/arch/arm64/boot/Image.gz
