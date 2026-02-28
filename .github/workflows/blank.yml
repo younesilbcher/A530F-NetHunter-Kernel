@@ -1,21 +1,54 @@
 name: Build Kernel
-on: [push]
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev libgl1-mesa-dev libxml2-utils xsltproc unzip python3-pip
+
+      - name: Clone Toolchain
+        run: |
+          # تحميل أداة بناء متوافقة
+          git clone --depth=1 https://github.com/akhilnarang/arm64-mw-gcc-10.2.0.git toolchain
+
+      - name: Clone Kernel Source
+        run: |
+          # تحميل سورس النواة المخصص
+          git clone --depth=1 https://github.com/devkingsteam/SWIFT-android_kernel_samsung_universal7885.git kernel
+
       - name: Build Kernel
         run: |
-          # هنا يجب وضع أوامر تجميع الكرنل الخاصة بجهازك A8 2018
-          # هذه الأوامر تختلف حسب الكود المصدري الذي حصلت عليه
-          echo "جاري بناء النواة..."
-          # مثال لأمر بناء (يجب تعديله بناءً على الكود الخاص بك):
-          # make ARCH=arm64 O=out android_defconfig
-          # make ARCH=arm64 O=out -j$(nproc)
-      - name: Upload Kernel Image
+          cd kernel
+          # إعداد متغيرات البيئة
+          export ARCH=arm64
+          export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-elf-
+          export CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/toolchain/bin/arm-eabi-
+          
+          # تفعيل ميزات NetHunter في ملف الإعدادات
+          echo "CONFIG_WLAN=y" >> arch/arm64/configs/universal7885_defconfig                
+          echo "CONFIG_MAC80211=y" >> arch/arm64/configs/universal7885_defconfig                
+          echo "CONFIG_CFG80211=y" >> arch/arm64/configs/universal7885_defconfig                
+          
+          # بناء النواة
+          make O=out universal7885_defconfig                
+          make O=out -j$(nproc --all)
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-image
-          path: out/arch/arm64/boot/Image.gz-dtb
+          name: kernel-build
+          path: kernel/out/arch/arm64/boot/Image.gz
