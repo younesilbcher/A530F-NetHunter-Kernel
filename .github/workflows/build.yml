@@ -22,28 +22,28 @@ jobs:
 
       - name: Clone Toolchain
         run: |
-          # تحميل أداة بناء متوافقة مع معالج Exynos 7885
-          git clone --depth=1 https://github.com/akhilnarang/arm64-mw-gcc-10.2.0.git toolchain
+          # أداة بناء موثوقة ومتوافقة (Arter97)
+          git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
       - name: Clone Kernel Source
         run: |
-          # تحميل سورس النواة المحدد
+          # سورس النواة المحدد
           git clone --depth=1 https://github.com/devkingsteam/SWIFT-android_kernel_samsung_universal7885.git kernel
 
       - name: Build Kernel
         run: |
           cd kernel
-          # إعداد متغيرات البيئة لأداة البناء
+          # إعداد متغيرات البيئة بدقة
           export ARCH=arm64
-          export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-elf-
-          export CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/toolchain/bin/arm-eabi-
+          export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=$GITHUB_WORKSPACE/toolchain/bin/arm-linux-gnu-
           
-          # تفعيل ميزات NetHunter (إضافة تعريفات الحماية)
+          # تفعيل ميزات NetHunter تلقائياً
           echo "CONFIG_WLAN=y" >> arch/arm64/configs/universal7885_defconfig                
           echo "CONFIG_MAC80211=y" >> arch/arm64/configs/universal7885_defconfig                
           echo "CONFIG_CFG80211=y" >> arch/arm64/configs/universal7885_defconfig                
           
-          # بناء النواة
+          # بناء النواة (استخدام اسم defconfig الصحيح للسورس)
           make O=out universal7885_defconfig                
           make O=out -j$(nproc --all)
 
