@@ -12,7 +12,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          # --- تم إضافة ccache هنا لإصلاح الخطأ ---
+          # تثبيت الحزم الأساسية بما فيها ccache لتجنب خطأ 127
           sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
           libgl1-mesa-dev libx11-dev libncurses5-dev xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
 
@@ -22,6 +22,7 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
+          # رابط صحيح لتجنب خطأ 128
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
       - name: Build Kernel
@@ -33,19 +34,17 @@ jobs:
           # إعداد النواة
           make O=out Neternels-a10_defconfig
           
-          # --- تفعيل Mass Storage و Driver الأساسية ---
+          # --- إضافة إضافات Mass Storage ---
           echo "CONFIG_USB_STORAGE=y" >> out/.config
           echo "CONFIG_BLK_DEV_SD=y" >> out/.config
-          echo "CONFIG_USB_SUPPORT=y" >> out/.config
-          echo "CONFIG_USB=y" >> out/.config
+          # ----------------------------------
 
-          # تفعيل باقي الإعدادات الخاصة بك
+          # تفعيل تعريفات أخرى
           scripts/config --file out/.config --enable CONFIG_WLAN
           scripts/config --file out/.config --enable CONFIG_MAC80211
           scripts/config --file out/.config --enable CONFIG_CFG80211
-          scripts/config --file out/.config --enable CONFIG_USB_CONFIGFS_F_HID
           
-          # بناء النواة
+          # بناء النواة باستخدام كافة الأنوية
           make O=out -j$(nproc --all)
 
       - name: Package Kernel
@@ -53,6 +52,7 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git
           cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
+          # تعديل اسم الجهاز
           sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
           zip -r ../NetHunter-Kernel-AB-2010.zip *
 
