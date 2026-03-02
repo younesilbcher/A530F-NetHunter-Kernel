@@ -1,31 +1,28 @@
-name: NetHunter Kernel Complete Build
+name: Build NetHunter Kernel
 
-on:
-  workflow_dispatch:
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Install Dependencies
         run: |
           sudo apt-get update
+          # --- تم إضافة ccache هنا لإصلاح الخطأ ---
           sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
-          libgl1-mesa-dev libxml2-utils xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
+          libgl1-mesa-dev libx11-dev libncurses5-dev xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
 
-      - name: Clone Toolchain
+      - name: Setup Toolchain
         run: |
-          # تحميل أداة بناء Arter97 الموثوقة
           git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
       - name: Clone Kernel Source
         run: |
-          # تحميل سورس Neternels المحدث
-          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-Q-R-S.git kernel
+          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
       - name: Build Kernel
         run: |
@@ -33,30 +30,34 @@ jobs:
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
           
-          # اختيار ملف الإعدادات الصحيح لسورس Neternels
+          # إعداد النواة
           make O=out Neternels-a10_defconfig
           
-          # حقن تعريفات وضع المراقبة (Monitor Mode) و HID
+          # --- تفعيل Mass Storage و Driver الأساسية ---
+          echo "CONFIG_USB_STORAGE=y" >> out/.config
+          echo "CONFIG_BLK_DEV_SD=y" >> out/.config
+          echo "CONFIG_USB_SUPPORT=y" >> out/.config
+          echo "CONFIG_USB=y" >> out/.config
+
+          # تفعيل باقي الإعدادات الخاصة بك
           scripts/config --file out/.config --enable CONFIG_WLAN
           scripts/config --file out/.config --enable CONFIG_MAC80211
           scripts/config --file out/.config --enable CONFIG_CFG80211
           scripts/config --file out/.config --enable CONFIG_USB_CONFIGFS_F_HID
           
-          # بدء التجميع الفعلي
+          # بناء النواة
           make O=out -j$(nproc --all)
 
-      - name: Package to Flashable ZIP
+      - name: Package Kernel
         run: |
-          # جلب قالب AnyKernel3 لإنشاء ملف ZIP الذي طلبته
           git clone https://github.com/osm0sis/AnyKernel3.git
           cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
-          # تعديل اسم الجهاز في السكربت لضمان التوافق
           sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
-          zip -r../NetHunter-Kernel-A8-2018.zip *
+          zip -r ../NetHunter-Kernel-AB-2010.zip *
 
-      - name: Upload Flashable ZIP
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: NetHunter-ZIP-Final
-          path: NetHunter-Kernel-A8-2018.zip
+          path: NetHunter-Kernel-AB-2010.zip
