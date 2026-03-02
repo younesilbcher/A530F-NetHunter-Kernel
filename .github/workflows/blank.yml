@@ -22,7 +22,7 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          # تأكد من أن الرابط هنا يفتح مستودعاً عاماً (Public)
+          # رابط مستودع عام ومباشر لتجنب خطأ 128
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
       - name: Build Kernel
@@ -31,7 +31,7 @@ jobs:
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
           
-          # إعداد النواة باستخدام ملف defconfig المناسب لـ A530F
+          # إعداد النواة باستخدام الملف الافتراضي المناسب للجهاز
           make O=out Neternels-a10_defconfig
           
           # --- إضافة إضافات Mass Storage مباشرة إلى ملف الإعدادات ---
