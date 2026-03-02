@@ -22,7 +22,7 @@ jobs:
 
       - name: Clone Kernel Source
         run: |
-          # رابط مستودع عام ومباشر لتجنب خطأ 128
+          # استخدام رابط مستودع عام لتجنب خطأ 128
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
       - name: Build Kernel
@@ -31,7 +31,7 @@ jobs:
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
           
-          # إعداد النواة باستخدام الملف الافتراضي المناسب للجهاز
+          # إعداد النواة باستخدام الملف الافتراضي المناسب للجهاز (A530F)
           make O=out Neternels-a10_defconfig
           
           # --- إضافة إضافات Mass Storage مباشرة إلى ملف الإعدادات ---
@@ -39,7 +39,7 @@ jobs:
           echo "CONFIG_BLK_DEV_SD=y" >> out/.config
           # ----------------------------------
 
-          # تفعيل تعريفات إضافية ضرورية
+          # تفعيل تعريفات إضافية ضرورية لـ NetHunter
           scripts/config --file out/.config --enable CONFIG_WLAN
           scripts/config --file out/.config --enable CONFIG_MAC80211
           scripts/config --file out/.config --enable CONFIG_CFG80211
@@ -52,7 +52,7 @@ jobs:
           git clone https://github.com/osm0sis/AnyKernel3.git
           cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
-          # تعديل اسم الجهاز في سكربت الحزم
+          # تعديل اسم الجهاز في سكربت الحزم ليتوافق مع A530F
           sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
           zip -r ../NetHunter-Kernel-AB-2010.zip *
 
