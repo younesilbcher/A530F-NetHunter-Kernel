@@ -1,7 +1,7 @@
-name: Build NetHunter Kernel A530F
+name: Build NetHunter Kernel A530F - Stable
 
 on:
-  workflow_dispatch: # يسمح لك بتشغيل البناء يدوياً
+  workflow_dispatch: # تشغيل يدوي للتحكم الكامل
 
 jobs:
   build:
@@ -10,52 +10,52 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Dependencies
+      - name: Setup Build Environment
         run: |
           sudo apt-get update
-          # تثبيت كافة الأدوات بما فيها ccache و libssl لإصلاح خطأ 127
+          # تثبيت كل المتطلبات دفعة واحدة لإصلاح خطأ 127
           sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
           libgl1-mesa-dev libx11-dev libncurses5-dev xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
 
-      - name: Setup Toolchain (Arter97)
+      - name: Toolchain Setup
         run: |
+          # استخدام Toolchain ثابت لتجنب مشاكل التوافق
           git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
-      - name: Clone Kernel Source
+      - name: Clone Kernel Source (New Target)
         run: |
-          # استخدام سورس Neternels المعروف باستقراره لـ A530F
+          # استخدام سورس Neternels العام لتجنب خطأ 128
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
-      - name: Build Kernel
+      - name: Build and Enable Mass Storage
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
           
-          # 1. إعداد ملف الإعدادات الأساسي
+          # إعداد ملف defconfig الصحيح للجهاز
           make O=out Neternels-a10_defconfig
           
-          # 2. تفعيل Mass Storage و NetHunter (الحل البرمجي)
+          # --- تفعيل Mass Storage و NetHunter برمجياً ---
           scripts/config --file out/.config --enable CONFIG_USB_STORAGE
           scripts/config --file out/.config --enable CONFIG_BLK_DEV_SD
-          scripts/config --file out/.config --enable CONFIG_WLAN
           scripts/config --file out/.config --enable CONFIG_USB_F_MASS_STORAGE
+          scripts/config --file out/.config --enable CONFIG_WLAN
           
-          # 3. البناء النهائي
+          # بدء البناء
           make O=out -j$(nproc --all)
 
-      - name: Package with AnyKernel3
+      - name: Create Flashable ZIP
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git
-          # نسخ ملف النواة الناتج
           cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
-          # تعديل اسم الجهاز ليتوافق مع A530F (jackpotlte)
+          # تحديد هوية الجهاز (jackpotlte) لضمان القبول في TWRP
           sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
-          zip -r ../NetHunter-Kernel-A530F-Final.zip *
+          zip -r ../NetHunter-Kernel-A530F.zip *
 
-      - name: Upload Kernel
+      - name: Upload Finished Kernel
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-A530F
-          path: NetHunter-Kernel-A530F-Final.zip
+          name: NetHunter-Kernel-A530F
+          path: NetHunter-Kernel-A530F.zip
