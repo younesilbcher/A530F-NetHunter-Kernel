@@ -1,0 +1,22 @@
+      - name: سلسلة أدوات الاستنساخ
+        run: |
+          # الرابط الأول
+          git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
+
+      - name: استنساخ مصدر النواة
+        run: |
+          # الرابط الثاني
+          git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
+
+      - name: بناء النواة
+        run: |
+          cd kernel
+          # إعداد ملف defconfig
+          make O=out Neternels-a10_defconfig
+          
+          # تفعيل Mass Storage
+          ./scripts/config --file out/.config --enable CONFIG_USB_STORAGE
+          ./scripts/config --file out/.config --enable CONFIG_BLK_DEV_SD
+          
+          # البدء في البناء النهائي
+          make O=out -j$(nproc --all)
