@@ -1,22 +1,59 @@
+name: Build NetHunter A530F Final
+
+on:
+  workflow_dispatch: # لتشغيل البناء يدوياً من تبويب Actions
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: تثبيت التبعات
+        run: |
+          sudo apt-get update
+          # هنا تم دمج أمر ccache مع بقية الأدوات لحل الخطأ 127 الظاهر في صورك
+          sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
+          libgl1-mesa-dev libx11-dev libncurses5-dev xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
+
       - name: سلسلة أدوات الاستنساخ
         run: |
-          # الرابط الأول
+          # الرابط الأول: أداة البناء (Toolchain)
           git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
       - name: استنساخ مصدر النواة
         run: |
-          # الرابط الثاني
+          # الرابط الثاني: سورس النواة العام (لحل الخطأ 128 الظاهر في صورك)
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
       - name: بناء النواة
         run: |
           cd kernel
-          # إعداد ملف defconfig
+          export ARCH=arm64
+          export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
+          
+          # إعداد ملف defconfig الصحيح (كما في صورتك الأخيرة)
           make O=out Neternels-a10_defconfig
           
-          # تفعيل Mass Storage
+          # تفعيل Mass Storage برمجياً لضمان العمل
           ./scripts/config --file out/.config --enable CONFIG_USB_STORAGE
           ./scripts/config --file out/.config --enable CONFIG_BLK_DEV_SD
           
           # البدء في البناء النهائي
           make O=out -j$(nproc --all)
+
+      - name: حزمة النواة
+        run: |
+          git clone https://github.com/osm0sis/AnyKernel3.git
+          cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
+          cd AnyKernel3
+          # تحديد اسم الجهاز jackpotlte لضمان التوافق مع A530F
+          sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
+          zip -r ../NetHunter-Kernel-A530F.zip *
+
+      - name: تحميل العنصر الناتج
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetHunter-A530F-Kernel
+          path: NetHunter-Kernel-A530F.zip
