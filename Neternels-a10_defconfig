@@ -1,4 +1,4 @@
-name: Final Build NetHunter A530F
+name: Build NetHunter Kernel A530F - Dev Version
 
 on:
   workflow_dispatch: 
@@ -10,51 +10,51 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: تثبيت التبعات
+      - name: تثبيت التبعات (حل خطأ 127)
         run: |
           sudo apt-get update
-          # تثبيت ccache والمكتبات لحل خطأ 127
+          # إضافة ccache والمكتبات التقنية التي يطلبها المطورون
           sudo apt-get install -y git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev \
           libgl1-mesa-dev libx11-dev libncurses5-dev xsltproc unzip python3-pip ccache bc libssl-dev libelf-dev
 
-      - name: إعداد سلسلة الأدوات
+      - name: إعداد سلسلة الأدوات (Arter97)
         run: |
-          # رابط الأداة (Toolchain)
           git clone --depth=1 https://github.com/arter97/arm64-gcc.git toolchain
 
-      - name: استنساخ مصدر النواة
+      - name: استنساخ مصدر النواة (حل خطأ 128)
         run: |
-          # الرابط الصحيح والمباشر لحل خطأ 128 الظاهر في صورك
+          # نستخدم هذا الرابط العام لأنه يحتوي على "الأكواد المعدلة" لجهازك
           git clone --depth=1 https://github.com/Neternels/Nethunter-Kernel-Exynos7885-QRS.git kernel
 
-      - name: بناء النواة وتفعيل Mass Storage
+      - name: بناء النواة وتفعيل ميزات المطورين (Mass Storage)
         run: |
           cd kernel
           export ARCH=arm64
           export CROSS_COMPILE=$GITHUB_WORKSPACE/toolchain/bin/aarch64-linux-gnu-
           
-          # استخدام اسم الملف الذي حددته في صورتك (Neternels-a10_defconfig)
+          # 1. إعداد الملف الأساسي
           make O=out Neternels-a10_defconfig
           
-          # أوامر تفعيل Mass Storage
+          # 2. دمج "الأكواد المعدلة" لتفعيل Mass Storage برمجياً (كما يفعل المطورون)
           ./scripts/config --file out/.config --enable CONFIG_USB_STORAGE
           ./scripts/config --file out/.config --enable CONFIG_BLK_DEV_SD
           ./scripts/config --file out/.config --enable CONFIG_USB_F_MASS_STORAGE
+          ./scripts/config --file out/.config --enable CONFIG_USB_CONFIGFS_MASS_STORAGE
+          ./scripts/config --file out/.config --enable CONFIG_USB_G_ANDROID
           
-          # بدء البناء
+          # 3. البناء النهائي
           make O=out -j$(nproc --all)
 
-      - name: حزمة النواة
+      - name: حزمة النواة (Flashable ZIP)
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git
           cp kernel/out/arch/arm64/boot/Image.gz AnyKernel3/
           cd AnyKernel3
-          # تحديد اسم الجهاز jackpotlte لضمان التوافق
           sed -i 's/device.name1=/device.name1=jackpotlte/g' anykernel.sh
-          zip -r ../NetHunter-Kernel-A530F.zip *
+          zip -r ../NetHunter-Kernel-A530F-Final.zip *
 
       - name: تحميل الملف الناتج
         uses: actions/upload-artifact@v4
         with:
-          name: NetHunter-A530F-Final
-          path: NetHunter-Kernel-A530F.zip
+          name: Kernel-NetHunter-MassStorage
+          path: NetHunter-Kernel-A530F-Final.zip
